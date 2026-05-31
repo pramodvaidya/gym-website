@@ -78,7 +78,7 @@ export default function SignupPage() {
 
             <div className="form-group">
               <label className="form-label">Full Name</label>
-              <input className="form-input" placeholder="John Smith" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <input className="form-input" placeholder="Pramod Vaidya" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className="form-group">
               <label className="form-label">Email Address</label>
