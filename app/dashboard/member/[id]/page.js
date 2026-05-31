@@ -173,8 +173,9 @@ export default function MemberProfilePage() {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 420 }}>
             <h3 className="modal-title">🗑️ Delete Membership</h3>
-            <p className="modal-subtitle">You are about to permanently delete the plan <strong>"{deleteModal.planName}"</strong> from this member's history. This action cannot be undone.</p>
-            {deleteError && <div className="alert alert-error">{deleteError}</div>}
+<p className="modal-subtitle">
+  You are about to permanently delete the plan <strong>&quot;{deleteModal.planName}&quot;</strong> from this member&#39;s history. This action cannot be undone.
+</p>            {deleteError && <div className="alert alert-error">{deleteError}</div>}
             <div className="form-group">
               <label className="form-label">Enter Admin Password to confirm</label>
               <input
