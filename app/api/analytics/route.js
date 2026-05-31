@@ -21,13 +21,25 @@ export async function GET(req) {
     // Total revenue from active plans
     const totalRevenue = members.reduce((sum, m) => sum + (m.currentPlan?.fee || 0), 0);
 
-    // Revenue by plan
+    // Revenue by plan & Demographics
     const planBreakdown = {};
+    const genderBreakdown = { Male: 0, Female: 0, Other: 0 };
+    const ageBreakdown = { '<20': 0, '20-30': 0, '31-40': 0, '40+': 0 };
+
     members.forEach((m) => {
       const pn = m.currentPlan?.planName || 'Unknown';
       if (!planBreakdown[pn]) planBreakdown[pn] = { count: 0, revenue: 0 };
       planBreakdown[pn].count++;
       planBreakdown[pn].revenue += m.currentPlan?.fee || 0;
+
+      if (m.gender === 'Male') genderBreakdown.Male++;
+      else if (m.gender === 'Female') genderBreakdown.Female++;
+      else genderBreakdown.Other++;
+
+      if (m.age < 20) ageBreakdown['<20']++;
+      else if (m.age <= 30) ageBreakdown['20-30']++;
+      else if (m.age <= 40) ageBreakdown['31-40']++;
+      else ageBreakdown['40+']++;
     });
 
     // Monthly revenue from plan history
@@ -59,6 +71,8 @@ export async function GET(req) {
     return NextResponse.json({
       totalRevenue,
       planBreakdown,
+      genderBreakdown,
+      ageBreakdown,
       monthlyRevenue,
       stats: { totalMembers, activeMembers, inactiveMembers, expiredMembers, expiringSoon },
       gymName: owner.gymName,

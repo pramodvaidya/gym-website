@@ -8,8 +8,8 @@ export default function PlansPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [editIdx, setEditIdx] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', durationMonths: '', fee: '' });
-  const [newPlan, setNewPlan] = useState({ name: '', durationMonths: '', fee: '' });
+  const [editForm, setEditForm] = useState({ name: '', durationValue: '', durationUnit: 'months', fee: '' });
+  const [newPlan, setNewPlan] = useState({ name: '', durationValue: '', durationUnit: 'months', fee: '' });
   const [addOpen, setAddOpen] = useState(false);
   const [toast, setToast] = useState('');
 
@@ -24,10 +24,10 @@ export default function PlansPage() {
   useEffect(() => { fetchPlans(); }, []);
 
   const DEFAULT_PLANS = [
-    { name: '1 Month', durationMonths: 1, fee: 800 },
-    { name: '3 Month', durationMonths: 3, fee: 2000 },
-    { name: '6 Month', durationMonths: 6, fee: 3500 },
-    { name: '1 Year', durationMonths: 12, fee: 6000 },
+    { name: '1 Month', durationUnit: 'months', durationValue: 1, fee: 800 },
+    { name: '3 Month', durationUnit: 'months', durationValue: 3, fee: 2000 },
+    { name: '6 Month', durationUnit: 'months', durationValue: 6, fee: 3500 },
+    { name: '1 Year', durationUnit: 'months', durationValue: 12, fee: 6000 },
   ];
 
   const importDefaults = async () => {
@@ -55,27 +55,37 @@ export default function PlansPage() {
   };
 
   const handleAdd = async () => {
-    if (!newPlan.name || !newPlan.durationMonths || !newPlan.fee) {
-      showMsg('Please fill all fields', true); return;
+    if (!newPlan.name || Number(newPlan.durationValue) < 1 || Number(newPlan.fee) < 0) {
+      showMsg('Please fill all fields correctly', true); return;
     }
     setSaving(true);
     const res = await fetch('/api/plans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newPlan),
+      body: JSON.stringify({
+        ...newPlan,
+        durationValue: Number(newPlan.durationValue),
+        fee: Number(newPlan.fee),
+      }),
     });
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { showMsg(data.error || 'Failed to add plan', true); return; }
     setPlans(data.plans);
-    setNewPlan({ name: '', durationMonths: '', fee: '' });
+    setNewPlan({ name: '', durationValue: '', durationUnit: 'months', fee: '' });
     setAddOpen(false);
     showMsg('✅ Plan added successfully!');
   };
 
   const startEdit = (i) => {
+    const plan = plans[i];
     setEditIdx(i);
-    setEditForm({ name: plans[i].name, durationMonths: plans[i].durationMonths, fee: plans[i].fee });
+    setEditForm({
+      name: plan.name,
+      durationUnit: plan.durationUnit || 'months',
+      durationValue: plan.durationValue ?? plan.durationMonths ?? '',
+      fee: plan.fee,
+    });
   };
 
   const handleEdit = async () => {
@@ -83,7 +93,12 @@ export default function PlansPage() {
     const res = await fetch('/api/plans', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ index: editIdx, ...editForm }),
+      body: JSON.stringify({
+        index: editIdx,
+        ...editForm,
+        durationValue: Number(editForm.durationValue),
+        fee: Number(editForm.fee),
+      }),
     });
     const data = await res.json();
     setSaving(false);
@@ -108,7 +123,13 @@ export default function PlansPage() {
     showMsg('🗑 Plan removed');
   };
 
-  const durationLabel = (m) => m === 1 ? '1 Month' : m === 12 ? '1 Year' : `${m} Months`;
+  const durationLabel = (value, unit) => {
+    if (!value) return '';
+    if (unit === 'days') return value === 1 ? '1 Day' : `${value} Days`;
+    return value === 1 ? '1 Month' : value === 12 ? '1 Year' : `${value} Months`;
+  };
+  const activePlanCount = plans.filter((plan) => (plan.activeMembers || 0) > 0).length;
+  const activeMemberTotal = plans.reduce((sum, plan) => sum + (plan.activeMembers || 0), 0);
 
   return (
     <div style={{ animation: 'fadeUp 0.4s ease', maxWidth: 800 }}>
@@ -117,11 +138,22 @@ export default function PlansPage() {
           <h1 className="page-title">🏷️ Membership Plans</h1>
           <p className="page-subtitle">Manage the plans offered at your gym</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-secondary" onClick={importDefaults} disabled={saving}>⬇️ Import Defaults</button>
           <button className="btn btn-primary" onClick={() => setAddOpen(true)}>➕ Add New Plan</button>
         </div>
       </div>
+
+      {plans.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+          <div style={{ padding: '10px 14px', background: 'rgba(38, 110, 247, 0.08)', border: '1px solid rgba(38, 110, 247, 0.18)', borderRadius: 999, color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>
+            🔥 {activePlanCount} plan{activePlanCount !== 1 ? 's' : ''} currently in use
+          </div>
+          <div style={{ padding: '10px 14px', background: 'rgba(22, 163, 74, 0.08)', border: '1px solid rgba(22, 163, 74, 0.18)', borderRadius: 999, color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>
+            👥 {activeMemberTotal} active member{activeMemberTotal !== 1 ? 's' : ''} on plans
+          </div>
+        </div>
+      )}
 
       {message && <div className="alert alert-success">{message}</div>}
       {error && <div className="alert alert-error">{error}</div>}
@@ -137,22 +169,33 @@ export default function PlansPage() {
                 <label className="form-label">Plan Name *</label>
                 <input
                   className="form-input"
-                  placeholder="e.g. 3 Month, Premium, Annual"
+                  placeholder="e.g. 3 Month, 7 Days, Annual"
                   value={newPlan.name}
                   onChange={e => setNewPlan({ ...newPlan, name: e.target.value })}
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Duration (Months) *</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder="e.g. 3"
-                  min={1}
-                  max={36}
-                  value={newPlan.durationMonths}
-                  onChange={e => setNewPlan({ ...newPlan, durationMonths: e.target.value })}
-                />
+                <label className="form-label">Duration *</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="e.g. 7"
+                    min={1}
+                    style={{ flex: 1, minWidth: 90 }}
+                    value={newPlan.durationValue}
+                    onChange={e => setNewPlan({ ...newPlan, durationValue: e.target.value })}
+                  />
+                  <select
+                    className="form-input"
+                    value={newPlan.durationUnit}
+                    onChange={e => setNewPlan({ ...newPlan, durationUnit: e.target.value })}
+                    style={{ width: 120 }}
+                  >
+                    <option value="months">Months</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
               </div>
               <div className="form-group" style={{ gridColumn: '2 / -1' }}>
                 <label className="form-label">Fee (₹) *</label>
@@ -166,15 +209,15 @@ export default function PlansPage() {
                 />
               </div>
             </div>
-            {newPlan.durationMonths && newPlan.fee && (
+            {newPlan.durationValue && newPlan.fee && (
               <div className="plan-preview" style={{ marginBottom: 16 }}>
                 <div className="plan-preview-item">
                   <span className="plan-preview-label">Duration</span>
-                  <span className="plan-preview-value">{durationLabel(Number(newPlan.durationMonths))}</span>
+                  <span className="plan-preview-value">{durationLabel(Number(newPlan.durationValue), newPlan.durationUnit)}</span>
                 </div>
                 <div className="plan-preview-item">
-                  <span className="plan-preview-label">Monthly Cost</span>
-                  <span className="plan-preview-value">₹{Math.round(newPlan.fee / newPlan.durationMonths)}/mo</span>
+                  <span className="plan-preview-label">Unit Cost</span>
+                  <span className="plan-preview-value">₹{Math.round(newPlan.fee / Number(newPlan.durationValue))}/{newPlan.durationUnit === 'days' ? 'day' : 'month'}</span>
                 </div>
                 <div className="plan-preview-item">
                   <span className="plan-preview-label">Total Fee</span>
@@ -183,7 +226,7 @@ export default function PlansPage() {
               </div>
             )}
             <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => { setAddOpen(false); setNewPlan({ name: '', durationMonths: '', fee: '' }); }}>Cancel</button>
+              <button className="btn btn-secondary" onClick={() => { setAddOpen(false); setNewPlan({ name: '', durationValue: '', durationUnit: 'months', fee: '' }); }}>Cancel</button>
               <button className="btn btn-primary" disabled={saving} onClick={handleAdd}>
                 {saving ? <><span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Saving...</> : '✅ Add Plan'}
               </button>
@@ -208,14 +251,26 @@ export default function PlansPage() {
             </div>
             <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group">
-                <label className="form-label">Duration (Months)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  min={1}
-                  value={editForm.durationMonths}
-                  onChange={e => setEditForm({ ...editForm, durationMonths: e.target.value })}
-                />
+                <label className="form-label">Duration</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    className="form-input"
+                    min={1}
+                    style={{ flex: 1, minWidth: 90 }}
+                    value={editForm.durationValue}
+                    onChange={e => setEditForm({ ...editForm, durationValue: e.target.value })}
+                  />
+                  <select
+                    className="form-input"
+                    value={editForm.durationUnit}
+                    onChange={e => setEditForm({ ...editForm, durationUnit: e.target.value })}
+                    style={{ width: 120 }}
+                  >
+                    <option value="months">Months</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Fee (₹)</label>
@@ -280,11 +335,22 @@ export default function PlansPage() {
 
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{plan.name}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                  <span>⏱ {durationLabel(plan.durationMonths)}</span>
-                  <span>📅 {plan.durationMonths} month{plan.durationMonths !== 1 ? 's' : ''}</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>≈ ₹{Math.round(plan.fee / plan.durationMonths).toLocaleString('en-IN')}/month</span>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span>⏱ {durationLabel(plan.durationValue ?? plan.durationMonths, plan.durationUnit)}</span>
+                  <span>📅 {plan.durationValue ?? plan.durationMonths} {plan.durationUnit === 'days' ? 'day' : 'month'}{(plan.durationUnit === 'days' ? plan.durationValue : plan.durationMonths) !== 1 ? 's' : ''}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    ≈ ₹{Math.round(plan.fee / (plan.durationUnit === 'days' ? Math.max(1, plan.durationValue ?? 1) : (plan.durationValue ?? plan.durationMonths))).toLocaleString('en-IN')}/{plan.durationUnit === 'days' ? 'day' : 'month'}
+                  </span>
+                  <span style={{ color: plan.activeMembers > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                    👥 {plan.activeMembers} active member{plan.activeMembers !== 1 ? 's' : ''}
+                  </span>
                 </div>
+                {plan.activeMembers > 0 && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, fontWeight: 700, color: 'var(--danger)' }}>
+                    <span style={{ background: 'rgba(220, 38, 38, 0.08)', border: '1px solid rgba(220, 38, 38, 0.18)', borderRadius: 999, padding: '4px 8px' }}>In use</span>
+                    <span>{plan.activeMembers} member{plan.activeMembers !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
               </div>
 
               <div style={{ textAlign: 'right' }}>
@@ -297,7 +363,7 @@ export default function PlansPage() {
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>total fee</div>
               </div>
 
-              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
                 <button
                   className="btn btn-secondary btn-sm"
                   onClick={() => startEdit(i)}
@@ -306,7 +372,8 @@ export default function PlansPage() {
                 <button
                   className="btn btn-danger btn-sm"
                   onClick={() => handleDelete(i)}
-                  title="Delete plan"
+                  title={plan.activeMembers > 0 ? 'Cannot delete while members are active on this plan' : 'Delete plan'}
+                  disabled={plan.activeMembers > 0 || saving}
                 >🗑</button>
               </div>
             </div>
@@ -318,7 +385,7 @@ export default function PlansPage() {
       {plans.length > 0 && (
         <div style={{ marginTop: 24, background: 'rgba(108,61,224,0.07)', border: '1px solid rgba(108,61,224,0.2)', borderRadius: 'var(--radius-md)', padding: '14px 20px' }}>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-            💡 <strong>Note:</strong> Editing or deleting a plan only affects <em>new</em> memberships. Existing members keep their current plan details in their history.
+            💡 <strong>Note:</strong> Editing a plan updates only future memberships. Existing members keep their current plan details, and a plan cannot be deleted while active members remain on it.
           </p>
         </div>
       )}
